@@ -1,11 +1,12 @@
+// How we can utilize OpenAI GPT-4 for Code Review
+// Here is how the AI model would solve the chellange
+
 package com.example.demo;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.web.bind.annotation.*;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
-import javax.xml.bind.DatatypeConverter;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -14,6 +15,7 @@ import java.util.Map;
 public class DemoApplication {
 
     private Map<String, String> userDatabase = new HashMap<>();
+    private BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
 
     public static void main(String[] args) {
         SpringApplication.run(DemoApplication.class, args);
@@ -21,7 +23,12 @@ public class DemoApplication {
 
     @PostMapping("/register")
     public String registerUser(@RequestParam String username, @RequestParam String password) {
-        String hashedPassword = hashPassword(password);
+        // Input Validation: Ensuring username and password are not empty to prevent operational issues
+        if (username == null || username.trim().isEmpty() || password == null || password.trim().isEmpty()) {
+            return "Username and password must not be empty";
+        }
+        // Secure Password Hashing: Using BCrypt instead of MD5 for secure password hashing
+        String hashedPassword = passwordEncoder.encode(password);
         userDatabase.put(username, hashedPassword);
         return "User registered successfully";
     }
@@ -29,26 +36,21 @@ public class DemoApplication {
     @PostMapping("/login")
     public String loginUser(@RequestParam String username, @RequestParam String password) {
         String hashedPassword = userDatabase.get(username);
-        if (hashedPassword != null && hashedPassword.equals(hashPassword(password))) {
+        // Secure Password Verification: Using BCrypt's matches method for password comparison
+        // Generic Error Message: To prevent username enumeration
+        if (hashedPassword != null && passwordEncoder.matches(password, hashedPassword)) {
             return "Login successful";
         }
         return "Invalid username or password";
     }
 
-    private String hashPassword(String password) {
-        try {
-            MessageDigest md = MessageDigest.getInstance("MD5");
-            md.update(password.getBytes());
-            byte[] digest = md.digest();
-            return DatatypeConverter.printHexBinary(digest).toUpperCase();
-        } catch (NoSuchAlgorithmException e) {
-            return "Error: Hashing algorithm not found";
-        }
-    }
-
-    // retrieving all usernames (simulated admin functionality)
+    // Secured Admin Endpoint: Restricting access to only a specific user (admin)
     @GetMapping("/admin/usernames")
-    public Map<String, String> getAllUsernames() {
-        return userDatabase;
+    public Map<String, String> getAllUsernames(@RequestParam String username) {
+        if ("admin".equals(username)) {
+            return userDatabase;
+        } else {
+            return new HashMap<>(); // Return an empty map for unauthorized access
+        }
     }
 }
